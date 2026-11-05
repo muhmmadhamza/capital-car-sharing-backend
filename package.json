@@ -1,0 +1,36 @@
+{
+  "name": "capital-car-sharing-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "db:create": "node src/database/create-db.js",
+    "migrate": "node src/database/migrate.js",
+    "seed": "node src/database/seed.js",
+    "db:setup": "npm run db:create && npm run migrate && npm run seed",
+    "test:upload": "node scripts/test-upload.js",
+    "test:verification:unit": "node --test scripts/verification.unit.test.js",
+    "test:verification": "node scripts/test-verification.js",
+    "verification:purge": "node scripts/purge-verification-documents.js",
+    "test:availability": "node scripts/test-availability.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.14",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

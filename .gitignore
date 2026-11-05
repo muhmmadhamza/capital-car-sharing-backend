@@ -1,0 +1,8 @@
+node_modules
+.env
+uploads/*
+!uploads/.gitkeep
+
+# Private identity documents (never commit, never serve)
+private-uploads/*
+!private-uploads/.gitkeep

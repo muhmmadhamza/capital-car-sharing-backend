@@ -32,7 +32,16 @@ async function searchCars(filters = {}) {
     params.push(value);
     where.push(sql.replace('?', `$${params.length}`));
   };
-
+  const list = (v) =>
+    [].concat(v ?? [])
+      .flatMap((x) => String(x).split(','))
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean);
+  const addAny = (sql, values) => {
+    if (!values.length) return;
+    params.push(values);
+    where.push(sql.replace('?', `$${params.length}`));
+  };
   if (filters.location) add('c.location ILIKE ?', `%${filters.location}%`);
   if (filters.carType) add('LOWER(c.type) = LOWER(?)', filters.carType);
   if (filters.minPrice !== undefined) add('c.daily_price >= ?', Number(filters.minPrice));

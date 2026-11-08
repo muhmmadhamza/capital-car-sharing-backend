@@ -14,8 +14,9 @@ const make = (windowMs, max, message, extra = {}) =>
 const perUser = { keyGenerator: (req) => `user:${req.user.id}` };
 
 // General API limiter
-const apiLimiter = make(15 * 60 * 1000, 600, 'Too many requests, please try again later');
-
+// const apiLimiter = make(15 * 60 * 1000, 600, 'Too many requests, please try again later');
+// const apiLimiter = make(15 * 60 * 1000, 600, 'Too many requests, please try again later');
+const apiLimiter = make(15 * 60 * 1000, parseInt(process.env.API_RATE_LIMIT_MAX || '600', 10), 'Too many requests, please try again later');
 // Stricter limiter for login/register (brute-force protection)
 const authLimiter = make(15 * 60 * 1000, 30, 'Too many authentication attempts, please try again later');
 

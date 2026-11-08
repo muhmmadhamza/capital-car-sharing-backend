@@ -21,21 +21,17 @@
 
 const config = require('../../config/env');
 
-// Register available storage drivers.
 const drivers = {
-  // Local storage driver
   local: () =>
     require('./local')({
       rootDir: config.upload.dir,
       publicBaseUrl: config.upload.publicBaseUrl,
     }),
 
-  // Cloudinary storage driver
   cloudinary: () =>
     require('./cloudinary'),
 };
 
-// Select driver from STORAGE_DRIVER environment variable.
 const driverName = config.upload.driver;
 const create = drivers[driverName];
 
@@ -45,7 +41,4 @@ if (!create) {
   );
 }
 
-// Initialize selected storage driver.
-const storage = create();
-
-module.exports = storage;
+module.exports = create();

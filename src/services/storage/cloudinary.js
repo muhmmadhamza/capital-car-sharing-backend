@@ -1,16 +1,21 @@
-const { v2: cloudinary } = require('cloudinary');
-const path = require('path');
+// 
 
+
+
+
+
+const { v2: cloudinary } = require('cloudinary');
 const config = require('../../config/env');
 
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
+const cloudName = config.upload.cloudinary.cloudName;
+const apiKey = config.upload.cloudinary.apiKey;
+const apiSecret = config.upload.cloudinary.apiSecret;
 
 if (!cloudName || !apiKey || !apiSecret) {
   throw new Error('Missing Cloudinary environment variables');
 }
 
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: cloudName,
   api_key: apiKey,
@@ -18,9 +23,11 @@ cloudinary.config({
   secure: true,
 });
 
-// Convert uploaded URL back to its Cloudinary public ID.
+// Convert Cloudinary URL into public ID.
 function getPublicId(url) {
   try {
+    if (typeof url !== 'string') return null;
+
     const parsed = new URL(url);
 
     if (
@@ -42,9 +49,12 @@ function getPublicId(url) {
 
     if (versionIndex === -1) return null;
 
-    const publicId = parts.slice(versionIndex + 1).join('/');
+    const publicId = parts
+      .slice(versionIndex + 1)
+      .join('/');
 
     return publicId.replace(/\.[^/.]+$/, '') || null;
+
   } catch {
     return null;
   }
@@ -52,6 +62,9 @@ function getPublicId(url) {
 
 function create() {
   return {
+    name: 'cloudinary',
+
+    // Upload image to Cloudinary
     async save({ key, buffer }) {
       if (!key || !Buffer.isBuffer(buffer)) {
         throw new Error('Invalid image upload data');
@@ -63,7 +76,9 @@ function create() {
 
       if (
         publicId.startsWith('/') ||
-        publicId.split('/').some(part => !part || part === '.' || part === '..')
+        publicId.split('/').some(
+          part => !part || part === '.' || part === '..'
+        )
       ) {
         throw new Error('Invalid image storage key');
       }
@@ -78,7 +93,15 @@ function create() {
             use_filename: false,
           },
           (error, uploaded) => {
-            if (error) return reject(error);
+            if (error) {
+              console.error('Cloudinary upload error:', {
+                message: error.message,
+                http_code: error.http_code,
+              });
+
+              return reject(error);
+            }
+
             resolve(uploaded);
           }
         );
@@ -92,19 +115,24 @@ function create() {
       };
     },
 
+    // Extract storage key from Cloudinary URL
     keyFromUrl(url) {
       return getPublicId(url);
     },
 
+    // Delete image from Cloudinary
     async removeByUrl(url) {
       const publicId = getPublicId(url);
 
       if (!publicId) return false;
 
-      const result = await cloudinary.uploader.destroy(publicId, {
-        resource_type: 'image',
-        invalidate: true,
-      });
+      const result = await cloudinary.uploader.destroy(
+        publicId,
+        {
+          resource_type: 'image',
+          invalidate: true,
+        }
+      );
 
       return result.result === 'ok';
     },

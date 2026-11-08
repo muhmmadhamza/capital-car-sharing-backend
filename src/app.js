@@ -11,6 +11,10 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
+// Hostinger puts a reverse proxy (HTTPS terminator) in front of the app. Trust exactly one hop so req.ip,
+// req.protocol and the rate limiters see the real client instead of the proxy.
+app.set('trust proxy', 1);
+
 app.disable('x-powered-by');
 app.use(helmet());
 app.use(
@@ -32,6 +36,7 @@ if (config.upload.driver === 'local') {
       index: false,
       dotfiles: 'ignore',
       redirect: false,
+      fallthrough: true, // a missing file becomes the normal JSON 404
       maxAge: '7d',
       immutable: true, // file names are random and never reused
       setHeaders: (res) => {

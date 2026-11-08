@@ -1,0 +1,422 @@
+{
+  "info": {
+    "name": "Capital Car Sharing - image upload test",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run the requests in order. Before the first run set the collection variables partnerEmail, partnerPassword and carId (an id of one of that partner's cars)."
+  },
+  "item": [
+    {
+      "name": "0. Health (API + database up)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 and database connected', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.database).to.eql('connected'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Partner login (saves token)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/partner/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "partner",
+            "login"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{partnerEmail}}\",\n  \"password\": \"{{partnerPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 with token', () => { pm.response.to.have.status(200); const t = pm.response.json().data.token; pm.expect(t).to.be.a('string'); pm.collectionVariables.set('token', t); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Upload image BEFORE the car exists (Add Car form)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/partners/me/car-images",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "partners",
+            "me",
+            "car-images"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "description": "Body > form-data > key 'image' (type File): choose a JPG, PNG or WebP up to 5 MB."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const url = pm.response.json().data.image.url;",
+              "pm.collectionVariables.set('stagedUrl', url);",
+              "pm.test('URL is https://api.capitalcarsharing.com/uploads/cars/<partnerId>/<uuid>.<ext>', () => pm.expect(url).to.match(/^https:\\/\\/api\\.capitalcarsharing\\.com\\/uploads\\/cars\\/\\d+\\/[0-9a-f-]{36}\\.(jpg|png|webp)$/));",
+              "pm.test('URL never contains localhost, NaN or undefined', () => pm.expect(url).to.not.match(/localhost|NaN|undefined|null/i));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Open the uploaded image in the browser path (GET stagedUrl)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{stagedUrl}}",
+          "host": [
+            "{{stagedUrl}}"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 and an image content type', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.match(/^image\\/(jpeg|png|webp)/); });",
+              "pm.test('served with nosniff', () => pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Upload image to an existing car",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/partners/me/cars/{{carId}}/images",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "partners",
+            "me",
+            "cars",
+            "{{carId}}",
+            "images"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "description": "Set the collection variable carId to one of YOUR cars first. Same form-data key: image."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const j = pm.response.json().data;",
+              "pm.test('response has image.id, image.url, image.carId and car', () => { pm.expect(j.image.id).to.be.a('number'); pm.expect(j.image.carId).to.eql(Number(pm.collectionVariables.get('carId'))); pm.expect(j.car.images).to.include(j.image.url); });",
+              "pm.collectionVariables.set('imageUrl', j.image.url);",
+              "pm.test('URL is https://api.capitalcarsharing.com/uploads/cars/<partnerId>/<uuid>.<ext>', () => pm.expect(url).to.match(/^https:\\/\\/api\\.capitalcarsharing\\.com\\/uploads\\/cars\\/\\d+\\/[0-9a-f-]{36}\\.(jpg|png|webp)$/));",
+              "pm.test('URL never contains localhost, NaN or undefined', () => pm.expect(url).to.not.match(/localhost|NaN|undefined|null/i));",
+              "pm.test('URL is https://api.capitalcarsharing.com/uploads/cars/<partnerId>/<uuid>.<ext>', () => pm.expect(j.image.url).to.match(/^https:\\/\\/api\\.capitalcarsharing\\.com\\/uploads\\/cars\\/\\d+\\/[0-9a-f-]{36}\\.(jpg|png|webp)$/));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Car details show the image (saved in PostgreSQL)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/partners/me/cars/{{carId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "partners",
+            "me",
+            "cars",
+            "{{carId}}"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const imgs = pm.response.json().data.car.images;",
+              "pm.test('car.images contains the uploaded URL', () => pm.expect(imgs).to.include(pm.collectionVariables.get('imageUrl')));",
+              "pm.test('no stored URL points to localhost', () => pm.expect(imgs.join(' ')).to.not.match(/localhost|127\\.0\\.0\\.1/));",
+              "pm.collectionVariables.set('imagesAfterRemoval', JSON.stringify(imgs.filter(u => u !== pm.collectionVariables.get('imageUrl'))));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Remove the image (PUT car with the image left out)",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/partners/me/cars/{{carId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "partners",
+            "me",
+            "cars",
+            "{{carId}}"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"images\": {{imagesAfterRemoval}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 and image gone from the car', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.car.images).to.not.include(pm.collectionVariables.get('imageUrl')); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Removed image no longer opens (file deleted)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{imageUrl}}",
+          "host": [
+            "{{imageUrl}}"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404 after removal', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Negative: upload without token -> 401",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/partners/me/car-images",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "partners",
+            "me",
+            "car-images"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.capitalcarsharing.com"
+    },
+    {
+      "key": "partnerEmail",
+      "value": ""
+    },
+    {
+      "key": "partnerPassword",
+      "value": ""
+    },
+    {
+      "key": "carId",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "stagedUrl",
+      "value": ""
+    },
+    {
+      "key": "imageUrl",
+      "value": ""
+    },
+    {
+      "key": "imagesAfterRemoval",
+      "value": "[]"
+    }
+  ]
+}

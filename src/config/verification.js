@@ -2,6 +2,7 @@
 // variables, so the operating region's rules can change without touching code. Values are read on every call
 // (cheap) so tests can change process.env. NOTE: load config/env.js (it runs dotenv) before first use.
 const path = require('path');
+const { expandHome } = require('../utils/paths');
 
 // Document types the code knows how to handle. VERIFICATION_DOCUMENT_TYPES picks which are accepted.
 // Add a type here (and nothing else) to support it; the database accepts any lower_snake_case type.
@@ -91,7 +92,7 @@ function getPolicy() {
     // Documents are deleted this many days after a review decision. 0 = never delete automatically.
     retentionDays: int(env.VERIFICATION_RETENTION_DAYS, 30, { min: 0, max: 3650 }),
     // Private storage folder. Must NOT be inside the public upload folder (checked when storage starts).
-    storageDir: path.resolve(env.VERIFICATION_STORAGE_DIR || 'private-uploads'),
+    storageDir: path.resolve(expandHome(env.VERIFICATION_STORAGE_DIR || 'private-uploads')),
     maxReasonLength: 500,
   };
 }

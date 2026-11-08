@@ -14,12 +14,13 @@
     "test:verification:unit": "node --test scripts/verification.unit.test.js",
     "test:verification": "node scripts/test-verification.js",
     "verification:purge": "node scripts/purge-verification-documents.js",
-    "test:availability": "node scripts/test-availability.js"
+    "test:availability": "node scripts/test-availability.js",
+    "test:storage:unit": "node --test scripts/storage.unit.test.js",
+    "fix:image-urls": "node scripts/fix-image-urls.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
-    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -1,5 +1,9 @@
 node_modules
 .env
+.env.*
+!.env.example
+!.env.production.example
+.env *
 uploads/*
 !uploads/.gitkeep
 

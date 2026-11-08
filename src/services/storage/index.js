@@ -41,4 +41,7 @@ if (!create) {
   );
 }
 
-module.exports = create();
+const storage = create();
+console.log(`[storage] active driver: ${storage.name} (STORAGE_DRIVER=${driverName})`);
+
+module.exports = storage;

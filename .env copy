@@ -1,41 +1,60 @@
-PORT=5000
+# PORT=5000
+# NODE_ENV=development
+
+# # Either set DATABASE_URL, or the individual DB_* values below.
+# # DATABASE_URL=postgresql://neondb_owner:npg_9NDxbLaV3wfJ@ep-divine-mud-bdvyn62s-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+# # # DB_HOST=localhost
+# # # DB_PORT=5432
+# # # DB_NAME=capital_car_sharing
+# # # DB_USER=postgres
+# # # DB_PASSWORD=123456
+# # # DB_HOST=Neon endpoint
+# # # DB_PORT=5432
+# # # DB_NAME=capital_car_sharing
+# # # DB_USER=postgres
+# # # DB_PASSWORD=npg_9NDxbLaV3wfJ
+# DATABASE_URL=postgresql://postgres:123456@localhost:5432/capital_car_sharing
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=capital_car_sharing
+# DB_USER=postgres
+# DB_PASSWORD=123456
+
+
+# JWT_SECRET=change-this-to-a-long-random-string
+# JWT_EXPIRES_IN=7d
+
+# CORS_ORIGIN=http://localhost:3000
+#    SMTP_HOST=smtp.gmail.com
+#    SMTP_PORT=587
+#    SMTP_SECURE=false
+#    SMTP_USER=hamxadev43@gmail.com
+#    SMTP_PASS=jlytzddrqotnguaf
+#    SMTP_FROM=Capital Car Sharing <hamxadev43@gmail.com>
+
+
+
+# PORT=5000
 NODE_ENV=development
 
 # Either set DATABASE_URL, or the individual DB_* values below.
-DATABASE_URL=postgresql://postgres:123456@localhost:5432/capital_car_sharing
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=capital_car_sharing
-DB_USER=postgres
-DB_PASSWORD=123456
+# DATABASE_URL=postgresql://postgres:123456@localhost:5432/capital_car_sharing
+DATABASE_URL=postgresql://neondb_owner:npg_9NDxbLaV3wfJ@ep-divine-mud-bdvyn62s-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+PUBLIC_BASE_URL=https://api.capitalcarsharing.com
 
 JWT_SECRET=change-this-to-a-long-random-string
 JWT_EXPIRES_IN=7d
 
-CORS_ORIGIN=http://localhost:3000
+CORS_ORIGIN=https://capitalcarsharing.com,https://www.capitalcarsharing.com
    SMTP_HOST=smtp.gmail.com
    SMTP_PORT=587
    SMTP_SECURE=false
    SMTP_USER=hamxadev43@gmail.com
    SMTP_PASS=jlytzddrqotnguaf
    SMTP_FROM=Capital Car Sharing <hamxadev43@gmail.com>
-   PASSWORD_RESET_TTL_MINUTES
-   PASSWORD_RESET_COOLDOWN_SECONDS
-   VERIFICATION_STORAGE_DIR
-   VERIFICATION_ENCRYPTION_KEY
-   VERIFICATION_DOCUMENT_TYPES
-   VERIFICATION_REQUIRE_DOCUMENT_NUMBER
-   VERIFICATION_ALLOWED_COUNTRIES
-   VERIFICATION_MIN_AGE
-   VERIFICATION_MAX_FILE_MB
-   VERIFICATION_RETENTION_DAYS
-   VERIFICATION_SUBMIT_LIMIT
 
+   STORAGE_DRIVER=local
 
-
-   BUSINESS_TIME_ZONE
-   PUBLIC_BASE_URL
-   STORAGE_DRIVER
-   FRONTEND_URL
-   UPLOAD_MAX_FILE_SIZE_MB
-   UPLOAD_DIR
+# CLOUDINARY_CLOUD_NAME=ehb4bnmf
+# CLOUDINARY_API_KEY=372884864714377
+# CLOUDINARY_API_SECRET=dZMFOfsd-7uY0arm7j7Ri_0XsZo

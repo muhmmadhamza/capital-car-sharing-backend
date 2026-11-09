@@ -4,6 +4,7 @@ const partnerService = require('../services/partner.service');
 const carService = require('../services/car.service');
 const storage = require('../services/storage');
 const availabilityService = require('../services/availability.service');
+const reservationService = require('../services/reservation.service');
 
 exports.getMe = asyncHandler(async (req, res) => {
   success(res, { partner: await partnerService.getProfile(req.user.id) });
@@ -71,3 +72,23 @@ exports.uploadStagedImage = asyncHandler(async (req, res) => {
   const { url } = await storage.save({ key: req.image.key, buffer: req.image.buffer });
   success(res, { image: { url } }, 201);
 });
+
+// ---- Bookings of this partner's cars. req.partner comes from the session; ids from the request are never trusted.
+exports.listReservations = asyncHandler(async (req, res) => {
+  const { reservations, meta } = await reservationService.listForPartner(req.partner.id, req.query);
+  success(res, { reservations }, 200, meta);
+});
+exports.reservationStats = asyncHandler(async (req, res) => {
+  success(res, { stats: await reservationService.statsForPartner(req.partner.id) });
+});
+exports.getReservation = asyncHandler(async (req, res) => {
+  success(res, { reservation: await reservationService.getForPartner(req.partner.id, Number(req.params.id)) });
+});
+const partnerAction = (to) =>
+  asyncHandler(async (req, res) => {
+    const actor = { id: req.user.id, role: 'partner', partnerId: req.partner.id };
+    success(res, { reservation: await reservationService.changeStatus(actor, Number(req.params.id), to, req.body && req.body.reason) });
+  });
+exports.approveReservation = partnerAction('confirmed');
+exports.rejectReservation = partnerAction('rejected');
+exports.completeReservation = partnerAction('completed');

@@ -14,7 +14,10 @@
     "test:verification:unit": "node --test scripts/verification.unit.test.js",
     "test:verification": "node scripts/test-verification.js",
     "verification:purge": "node scripts/purge-verification-documents.js",
-    "test:availability": "node scripts/test-availability.js"
+    "test:availability": "node scripts/test-availability.js",
+    "test:reservations:unit": "node --test scripts/reservation.unit.test.js",
+    "test:reservations": "node scripts/test-reservations.js",
+    "test:workflow": "node scripts/test-booking-workflow.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

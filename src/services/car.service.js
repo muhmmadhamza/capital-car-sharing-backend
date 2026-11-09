@@ -60,7 +60,7 @@ async function searchCars(filters = {}) {
       WHERE av.car_id = c.id AND av.status IN ('unavailable', 'booked') AND av.date BETWEEN ${a}::date AND ${b}::date)`);
     where.push(`NOT EXISTS (
       SELECT 1 FROM reservations r
-      WHERE r.car_id = c.id AND r.status IN ('upcoming', 'active')
+      WHERE r.car_id = c.id AND r.status IN ('pending', 'confirmed')
         AND r.pickup_date <= ${b}::date AND r.return_date >= ${a}::date)`);
   }
 
@@ -216,10 +216,10 @@ async function updatePartnerCar(partnerId, carId, d) {
 async function deletePartnerCar(partnerId, carId) {
   const existing = await getPartnerCar(partnerId, carId);
   const { rowCount } = await query(
-    `SELECT 1 FROM reservations WHERE car_id = $1 AND status IN ('upcoming', 'active')`,
+    `SELECT 1 FROM reservations WHERE car_id = $1 AND status IN ('pending', 'confirmed')`,
     [carId]
   );
-  if (rowCount) throw conflict('This car has upcoming or active reservations and cannot be deleted');
+  if (rowCount) throw conflict('This car has pending or confirmed reservations and cannot be deleted');
 
   try {
     await query('DELETE FROM cars WHERE id = $1 AND partner_id = $2', [carId, partnerId]);

@@ -37,8 +37,17 @@ const verificationSubmitLimiter = make(
 );
 const verificationDocumentLimiter = make(15 * 60 * 1000, 120, 'Too many document requests, please try again later', perUser);
 
+// Booking quotes and reservations: generous for real use, tight enough to stop scripted hammering. Per customer.
+const bookingLimiter = make(
+  15 * 60 * 1000,
+  parseInt(process.env.BOOKING_RATE_LIMIT_MAX || '60', 10),
+  'Too many booking requests, please try again in a few minutes',
+  perUser
+);
+
 module.exports = {
   apiLimiter,
+  bookingLimiter,
   authLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,

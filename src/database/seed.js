@@ -132,8 +132,8 @@ async function seed() {
       [0, 0, -30, -27, 'completed'],
       [2, 0, -10, -8, 'completed'],
       [5, 1, -2, 2, 'active'],
-      [1, 0, 4, 7, 'upcoming'],
-      [8, 2, 10, 12, 'upcoming'],
+      [1, 0, 4, 7, 'confirmed'],
+      [8, 2, 10, 12, 'pending'],
       [6, 1, 3, 5, 'cancelled'],
     ];
     for (const [ci, cu, from, to, status] of reservations) {
@@ -141,12 +141,12 @@ async function seed() {
       const days = to - from + 1;
       await client.query(
         `INSERT INTO reservations (customer_id, partner_id, car_id, pickup_location, pickup_date, return_date,
-                                   status, daily_price, total_price)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [customerIds[cu], partnerIds[car.p], carIds[ci], car.loc, fmt(offset(from)), fmt(offset(to)), status, car.price, car.price * days]
+                                   status, daily_price, rental_days, subtotal_amount, total_price)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`,
+        [customerIds[cu], partnerIds[car.p], carIds[ci], car.loc, fmt(offset(from)), fmt(offset(to)), status, car.price, days, car.price * days]
       );
       // Mirror live reservations into availability as 'booked'
-      if (status === 'upcoming' || status === 'active') {
+      if (status === 'pending' || status === 'confirmed') {
         for (const d of range(from, to)) {
           await client.query(
             `INSERT INTO availability (car_id, date, status) VALUES ($1,$2,'booked')

@@ -124,4 +124,35 @@ const availabilityUpdate = (req) => {
   return e;
 };
 
-module.exports = { idParam, register, login, forgotPassword, resetPassword, profile, car, carSearch, availabilityQuery, availabilityUpdate };
+// Body of POST /customers/me/reservations and /quote. Only the car and the rental window are accepted:
+// any price, status or availability the client adds is ignored (the server computes them).
+const reservationInput = (req) => {
+  const b = body(req);
+  const e = [];
+  if (!(Number.isInteger(b.carId) && b.carId > 0) && !(typeof b.carId === 'string' && /^\d+$/.test(b.carId) && Number(b.carId) > 0))
+    e.push('carId must be a positive whole number');
+  if (!v.isDate(b.pickupDate)) e.push('pickupDate must be YYYY-MM-DD');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.pickupTime || '')) e.push('pickupTime must be HH:mm');
+  if (!v.isDate(b.returnDate)) e.push('returnDate must be YYYY-MM-DD');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.returnTime || '')) e.push('returnTime must be HH:mm');
+  if (!e.length) req.body.carId = Number(b.carId);
+  return e;
+};
+
+// Optional free-text reason (reject / cancel). Whether one is REQUIRED depends on the transition, which the service decides.
+const reasonBody = (req) => {
+  const { reason } = body(req);
+  return reason === undefined || reason === null || (typeof reason === 'string' && reason.length <= 500)
+    ? []
+    : ['reason must be text of at most 500 characters'];
+};
+// Admin status change: { status, reason? }
+const adminStatusChange = (req) => {
+  const e = reasonBody(req);
+  if (!['pending', 'confirmed', 'completed', 'cancelled', 'rejected'].includes(body(req).status)) {
+    e.push('status must be one of: pending, confirmed, completed, cancelled, rejected');
+  }
+  return e;
+};
+
+module.exports = { reasonBody, adminStatusChange, reservationInput, idParam, register, login, forgotPassword, resetPassword, profile, car, carSearch, availabilityQuery, availabilityUpdate };

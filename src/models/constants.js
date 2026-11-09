@@ -6,5 +6,8 @@ module.exports = {
   CAR_STATUS: ['active', 'inactive'],
   CAR_APPROVAL_STATUS: ['pending', 'approved', 'rejected', 'suspended'],
   AVAILABILITY_STATUS: ['available', 'unavailable', 'booked'],
-  RESERVATION_STATUS: ['upcoming', 'active', 'completed', 'cancelled'],
+  RESERVATION_STATUS: ['pending', 'confirmed', 'completed', 'cancelled', 'rejected'],
+  // Statuses that hold a car for its dates. Cancelled / rejected / completed bookings free them.
+  // Every availability, search and deletion check uses this ONE list (see HOLDING_SQL).
+  RESERVATION_HOLDING_STATUS: ['pending', 'confirmed'],
 };

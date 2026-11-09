@@ -19,6 +19,7 @@ async function migrate() {
     if (applied.has(file)) continue;
     const sql = fs.readFileSync(path.join(dir, file), 'utf8');
     const client = await pool.connect();
+    client.on('notice', (n) => console.warn(`  [${file}] ${n.severity}: ${n.message}`)); // e.g. an optional constraint that was skipped
     try {
       await client.query('BEGIN');
       await client.query(sql);

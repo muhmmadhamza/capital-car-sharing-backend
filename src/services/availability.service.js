@@ -24,7 +24,7 @@ function rangeProblem(start, end) {
 
 /**
  * Day-by-day status for one or more cars. A day is:
- *  - booked       if an availability row says so OR an upcoming/active reservation covers it
+ *  - booked       if an availability row says so OR an pending/confirmed reservation covers it
  *  - unavailable  if the owner blocked it
  *  - available    otherwise
  * Because reservations are read live, future bookings block conflicting dates automatically.
@@ -42,7 +42,7 @@ async function dayStatusRows(carIds, start, end) {
             CASE
               WHEN a.status = 'booked' OR EXISTS (
                      SELECT 1 FROM reservations r
-                     WHERE r.car_id = wanted.car_id AND r.status IN ('upcoming', 'active')
+                     WHERE r.car_id = wanted.car_id AND r.status IN ('pending', 'confirmed')
                        AND days.day BETWEEN r.pickup_date AND r.return_date)
                 THEN 'booked'
               WHEN a.status = 'unavailable' THEN 'unavailable'
@@ -90,11 +90,11 @@ async function getTodayStatuses(carIds) {
 }
 
 // SQL fragment: is $day taken by a booking? Used by every check below so they cannot drift apart.
-// A day is booked when an availability row says so OR an upcoming/active reservation covers it.
+// A day is booked when an availability row says so OR an pending/confirmed reservation covers it.
 const BOOKED_SQL = (carParam, dayExpr) => `(
   EXISTS (SELECT 1 FROM availability a WHERE a.car_id = ${carParam} AND a.date = ${dayExpr} AND a.status = 'booked')
   OR EXISTS (SELECT 1 FROM reservations r
-             WHERE r.car_id = ${carParam} AND r.status IN ('upcoming', 'active')
+             WHERE r.car_id = ${carParam} AND r.status IN ('pending', 'confirmed')
                AND ${dayExpr} BETWEEN r.pickup_date AND r.return_date))`;
 
 const preview = (dates) => (dates.length > 5 ? `${dates.slice(0, 5).join(', ')} and ${dates.length - 5} more` : dates.join(', '));

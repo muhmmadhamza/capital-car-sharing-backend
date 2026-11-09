@@ -1,0 +1,60 @@
+# PORT=5000
+# NODE_ENV=development
+
+# # Either set DATABASE_URL, or the individual DB_* values below.
+# # DATABASE_URL=postgresql://neondb_owner:npg_9NDxbLaV3wfJ@ep-divine-mud-bdvyn62s-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+# # # DB_HOST=localhost
+# # # DB_PORT=5432
+# # # DB_NAME=capital_car_sharing
+# # # DB_USER=postgres
+# # # DB_PASSWORD=123456
+# # # DB_HOST=Neon endpoint
+# # # DB_PORT=5432
+# # # DB_NAME=capital_car_sharing
+# # # DB_USER=postgres
+# # # DB_PASSWORD=npg_9NDxbLaV3wfJ
+# DATABASE_URL=postgresql://postgres:123456@localhost:5432/capital_car_sharing
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=capital_car_sharing
+# DB_USER=postgres
+# DB_PASSWORD=123456
+
+
+# JWT_SECRET=change-this-to-a-long-random-string
+# JWT_EXPIRES_IN=7d
+
+# CORS_ORIGIN=http://localhost:3000
+#    SMTP_HOST=smtp.gmail.com
+#    SMTP_PORT=587
+#    SMTP_SECURE=false
+#    SMTP_USER=hamxadev43@gmail.com
+#    SMTP_PASS=jlytzddrqotnguaf
+#    SMTP_FROM=Capital Car Sharing <hamxadev43@gmail.com>
+
+
+
+# PORT=5000
+NODE_ENV=development
+
+# Either set DATABASE_URL, or the individual DB_* values below.
+# DATABASE_URL=postgresql://postgres:123456@localhost:5432/capital_car_sharing
+DATABASE_URL=postgresql://neondb_owner:npg_9NDxbLaV3wfJ@ep-divine-mud-bdvyn62s-pooler.c-8.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+
+JWT_SECRET=change-this-to-a-long-random-string
+JWT_EXPIRES_IN=7d
+
+CORS_ORIGIN=https://capitalcarsharing.com
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=hamxadev43@gmail.com
+   SMTP_PASS=jlytzddrqotnguaf
+   SMTP_FROM=Capital Car Sharing <hamxadev43@gmail.com>
+
+   STORAGE_DRIVER=local
+
+# CLOUDINARY_CLOUD_NAME=ehb4bnmf
+# CLOUDINARY_API_KEY=372884864714377
+# CLOUDINARY_API_SECRET=dZMFOfsd-7uY0arm7j7Ri_0XsZo

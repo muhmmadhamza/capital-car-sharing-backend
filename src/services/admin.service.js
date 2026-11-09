@@ -18,9 +18,11 @@ async function dashboard() {
       (SELECT COUNT(*) FROM cars WHERE approval_status = 'pending')                AS pending_cars,
       (SELECT COUNT(*) FROM cars WHERE approval_status = 'approved')               AS approved_cars,
       (SELECT COUNT(*) FROM reservations)                                          AS total_reservations,
-      (SELECT COUNT(*) FROM reservations WHERE status = 'upcoming')                AS upcoming_reservations,
-      (SELECT COUNT(*) FROM reservations WHERE status = 'active')                  AS active_reservations,
+      (SELECT COUNT(*) FROM reservations WHERE status = 'pending')                 AS pending_reservations,
+      (SELECT COUNT(*) FROM reservations WHERE status = 'confirmed')               AS confirmed_reservations,
       (SELECT COUNT(*) FROM reservations WHERE status = 'completed')               AS completed_reservations,
+      (SELECT COUNT(*) FROM reservations WHERE status = 'cancelled')               AS cancelled_reservations,
+      (SELECT COUNT(*) FROM reservations WHERE status = 'rejected')                AS rejected_reservations,
       (SELECT COALESCE(SUM(total_price), 0) FROM reservations WHERE status = 'completed') AS completed_reservation_value
   `);
   const { rows: recent } = await query(`
@@ -73,28 +75,8 @@ async function listPartners(opts) {
   return { partners: rows, meta: meta(pg, lim, total) };
 }
 
-async function listReservations(opts) {
-  const { pg, lim, offset } = paging(opts);
-  const params = [];
-  let where = 'TRUE';
-  if (opts.status) { params.push(opts.status); where += ` AND r.status = $${params.length}`; }
-
-  const total = (await query(`SELECT COUNT(*) AS total FROM reservations r WHERE ${where}`, params)).rows[0].total;
-  const { rows } = await query(
-    `SELECT r.id, r.customer_id, r.partner_id, r.car_id, r.pickup_location, r.pickup_date, r.return_date,
-            r.status, r.daily_price, r.total_price, r.created_at, r.updated_at,
-            u.name AS customer_name, u.email AS customer_email,
-            p.company_name AS partner_company_name,
-            c.make AS car_make, c.model AS car_model, c.year AS car_year
-     FROM reservations r
-     JOIN users u ON u.id = r.customer_id
-     JOIN partners p ON p.id = r.partner_id
-     JOIN cars c ON c.id = r.car_id
-     WHERE ${where} ORDER BY r.created_at DESC, r.id DESC LIMIT ${lim} OFFSET ${offset}`,
-    params
-  );
-  return { reservations: rows, meta: meta(pg, lim, total) };
-}
+// Kept for existing callers; the reservation queries live in reservation.service.js.
+const listReservations = (opts) => require('./reservation.service').listForAdmin(opts);
 
 // Suspending a partner also blocks their login; their cars disappear from public search
 // (public queries require partners.status = 'active').

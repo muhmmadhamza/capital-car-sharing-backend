@@ -33,6 +33,15 @@ router.put(
   c.setCarAvailability
 );
 
+// Bookings of this partner's cars. Ownership is enforced inside the service (partner_id comes from the session).
+router.use('/me/reservations', requirePartner);
+router.get('/me/reservations', c.listReservations);
+router.get('/me/reservations/stats', c.reservationStats);
+router.get('/me/reservations/:id', validate(rules.idParam()), c.getReservation);
+router.patch('/me/reservations/:id/approve', validate(rules.idParam()), c.approveReservation);
+router.patch('/me/reservations/:id/reject', validate(rules.idParam()), validate(rules.reasonBody), c.rejectReservation);
+router.patch('/me/reservations/:id/complete', validate(rules.idParam()), c.completeReservation);
+
 // Car photos. Auth, partner status and car ownership are all checked BEFORE the upload body is read.
 const partnerKey = (req) => `cars/${req.partner.id}`;
 const ownsCar = asyncHandler(async (req, _res, next) => {

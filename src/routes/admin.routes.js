@@ -11,6 +11,7 @@ router.get('/customers', c.customers);
 router.get('/partners', c.partners);
 router.get('/cars', c.cars);
 router.get('/reservations', c.reservations);
+router.get('/reservations/stats', c.reservationStats); // before /:id, which would read "stats" as an id
 router.get('/reservations/:id', validate(rules.idParam()), c.reservation);
 router.patch('/reservations/:id/status', validate(rules.idParam()), validate(rules.adminStatusChange), c.setReservationStatus);
 

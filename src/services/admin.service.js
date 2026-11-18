@@ -23,10 +23,12 @@ async function dashboard() {
       (SELECT COUNT(*) FROM reservations WHERE status = 'completed')               AS completed_reservations,
       (SELECT COUNT(*) FROM reservations WHERE status = 'cancelled')               AS cancelled_reservations,
       (SELECT COUNT(*) FROM reservations WHERE status = 'rejected')                AS rejected_reservations,
-      (SELECT COALESCE(SUM(total_price), 0) FROM reservations WHERE status = 'completed') AS completed_reservation_value
+      (SELECT COALESCE(SUM(total_price), 0) FROM reservations WHERE status = 'completed') AS completed_reservation_value,
+      (SELECT COUNT(*) FROM reservations WHERE booking_type = 'advance')           AS advance_reservations,
+      (SELECT COUNT(*) FROM reservations WHERE booking_type = 'advance' AND status = 'pending') AS pending_advance_reservations
   `);
   const { rows: recent } = await query(`
-    SELECT r.id, r.status, r.pickup_date, r.return_date, r.total_price,
+    SELECT r.id, r.status, r.booking_type, r.pickup_date, r.return_date, r.total_price,
            u.name AS customer_name, c.make AS car_make, c.model AS car_model
     FROM reservations r
     JOIN users u ON u.id = r.customer_id

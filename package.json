@@ -17,7 +17,9 @@
     "test:availability": "node scripts/test-availability.js",
     "test:reservations:unit": "node --test scripts/reservation.unit.test.js",
     "test:reservations": "node scripts/test-reservations.js",
-    "test:workflow": "node scripts/test-booking-workflow.js"
+    "test:workflow": "node scripts/test-booking-workflow.js",
+    "test:advance:unit": "node --test scripts/advance.unit.test.js",
+    "test:advance": "node scripts/test-advance-reservations.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

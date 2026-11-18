@@ -16,6 +16,9 @@ module.exports = {
   maxDays: number('BOOKING_MAX_DAYS', 30, { min: 1, max: 366 }),
   // How far ahead a pickup may be.
   maxAdvanceDays: number('BOOKING_MAX_ADVANCE_DAYS', 365, { min: 1, max: 730 }),
+  // A booking whose pickup is at least this many hours after it is made is an ADVANCE reservation (bookingType
+  // 'advance'); anything sooner is 'standard'. Both use the same table, rules, pricing and workflow.
+  advanceMinHours: number('BOOKING_ADVANCE_MIN_HOURS', 24, { min: 1, max: 720 }),
   // Customer cancellation: a PENDING booking can be cancelled any time before pickup; a CONFIRMED one up to this many
   // hours before pickup. Set 0 to allow cancelling right up to pickup. No fees or refunds are modelled (no payments yet).
   cancelMinHours: number('BOOKING_CANCEL_MIN_HOURS', 24, { min: 0, max: 720 }),

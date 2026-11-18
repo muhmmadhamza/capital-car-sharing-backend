@@ -1,5 +1,8 @@
 const v = require('../utils/validators');
 const { rangeProblem } = require('../services/availability.service');
+const bookingRules = require('../config/booking');
+const R = require('../utils/bookingRules');
+const { nowWall } = require('../utils/clock');
 const { ENUMS } = v;
 
 const body = (req) => req.body || {};
@@ -100,6 +103,15 @@ const carSearch = (req) => {
   if (q.minPrice !== undefined && q.maxPrice !== undefined && Number(q.minPrice) > Number(q.maxPrice))
     e.push('minPrice cannot be greater than maxPrice');
   if (q.seats !== undefined && !v.isIntInRange(q.seats, 1, 20)) e.push('seats must be between 1 and 20');
+  // bookingType=advance: the dates are required and must qualify as an advance reservation (same rules the server
+  // applies when the reservation is created). Without it the search behaves exactly as before.
+  if (q.bookingType !== undefined) {
+    if (!R.BOOKING_TYPES.includes(q.bookingType)) e.push(`bookingType must be one of: ${R.BOOKING_TYPES.join(', ')}`);
+    else if (q.bookingType === 'advance' && !e.length) {
+      if (!pickupDate || !returnDate) e.push('Advance search needs both pickupDate and returnDate');
+      else e.push(...R.validateAdvanceSearch({ pickupDate, returnDate }, nowWall(), bookingRules));
+    }
+  }
   return e;
 };
 
@@ -135,6 +147,8 @@ const reservationInput = (req) => {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.pickupTime || '')) e.push('pickupTime must be HH:mm');
   if (!v.isDate(b.returnDate)) e.push('returnDate must be YYYY-MM-DD');
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.returnTime || '')) e.push('returnTime must be HH:mm');
+  // Optional. 'advance' = "I want this as an advance reservation": refused unless the pickup is far enough ahead.
+  if (b.bookingType !== undefined && !R.BOOKING_TYPES.includes(b.bookingType)) e.push(`bookingType must be one of: ${R.BOOKING_TYPES.join(', ')}`);
   if (!e.length) req.body.carId = Number(b.carId);
   return e;
 };

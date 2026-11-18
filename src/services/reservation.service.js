@@ -1,27 +1,17 @@
 const { query, withTransaction } = require('../database/pool');
-const config = require('../config/env');
 const rules = require('../config/booking');
 const { unprocessable, notFound, conflict, forbidden } = require('../utils/errors');
 const R = require('../utils/bookingRules');
+const { nowWall } = require('../utils/clock');
 const availability = require('./availability.service');
 const verificationService = require('./verification.service');
-
-// Current wall-clock time ("YYYY-MM-DDTHH:mm") in the business time zone: what "in the future" means for a pickup.
-function nowWall(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: config.businessTimeZone,
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(date);
-  const get = (type) => parts.find((p) => p.type === type).value;
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
-}
 
 // Shared by every list and detail, so all three roles see the same fields (and stay in sync: one table, read live).
 const COLUMNS = `
   r.id, r.booking_reference, r.customer_id, r.partner_id, r.car_id, r.pickup_location,
   r.pickup_date, to_char(r.pickup_time, 'HH24:MI') AS pickup_time,
   r.return_date, to_char(r.return_time, 'HH24:MI') AS return_time,
-  r.status, r.daily_price, r.rental_days, r.subtotal_amount, r.service_fee_amount, r.tax_amount, r.total_price,
+  r.status, r.booking_type, r.daily_price, r.rental_days, r.subtotal_amount, r.service_fee_amount, r.tax_amount, r.total_price,
   r.created_at, r.updated_at,
   (SELECT h.reason FROM reservation_status_history h WHERE h.reservation_id = r.id ORDER BY h.id DESC LIMIT 1) AS status_reason,
   c.make AS car_make, c.model AS car_model, c.year AS car_year, c.type AS car_type,
@@ -50,16 +40,39 @@ const paging = ({ page, limit }) => {
 };
 const pageMeta = (pg, lim, total) => ({ page: pg, limit: lim, total, totalPages: Math.ceil(total / lim) });
 
+const isTrue = (v) => v === true || v === 'true' || v === '1';
+
+/**
+ * WHERE fragments for the advance-reservation filters, shared by the customer, partner and admin lists.
+ *   bookingType = standard | advance
+ *   upcoming    = true  ->  still holding the car (pending / confirmed) and the pickup time has not passed
+ * Appends its bound values to `params` and returns SQL that uses their placeholders.
+ */
+function typeFilters({ bookingType, upcoming }, params) {
+  const out = [];
+  if (bookingType !== undefined && bookingType !== '') {
+    if (!R.BOOKING_TYPES.includes(bookingType)) throw unprocessable(`bookingType must be one of: ${R.BOOKING_TYPES.join(', ')}`);
+    params.push(bookingType);
+    out.push(`r.booking_type = $${params.length}`);
+  }
+  if (isTrue(upcoming)) {
+    params.push(nowWall());
+    out.push(`r.status IN ('pending', 'confirmed') AND (r.pickup_date + r.pickup_time) > $${params.length}::timestamp`);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------------------------- reads
 
-async function listForCustomer(customerId, { status } = {}) {
+async function listForCustomer(customerId, { status, bookingType, upcoming } = {}) {
   const params = [customerId];
-  let where = 'r.customer_id = $1';
+  const where = ['r.customer_id = $1'];
   if (status) {
     params.push(status);
-    where += ` AND r.status = $${params.length}`;
+    where.push(`r.status = $${params.length}`);
   }
-  const { rows } = await query(`${RESERVATION_SELECT} WHERE ${where} ORDER BY r.pickup_date DESC, r.id DESC`, params);
+  for (const sql of typeFilters({ bookingType, upcoming }, params)) where.push(sql);
+  const { rows } = await query(`${RESERVATION_SELECT} WHERE ${where.join(' AND ')} ORDER BY r.pickup_date DESC, r.id DESC`, params);
   return rows;
 }
 
@@ -106,6 +119,7 @@ function listFilters(opts, scope) {
     if (!Number.isInteger(n) || n < 1) throw unprocessable(`${key} must be a positive whole number`);
     add(`${column} = ?`, n);
   }
+  where.push(...typeFilters(opts, params));
   if (opts.search) {
     const term = String(opts.search).trim().slice(0, 100);
     if (term) {
@@ -152,19 +166,56 @@ async function statsForPartner(partnerId) {
   const { rows: up } = await query(
     `SELECT COUNT(*) AS n FROM reservations WHERE partner_id = $1 AND status = 'confirmed' AND return_date >= $2::date`,
     [partnerId, nowWall().slice(0, 10)]);
-  return { total: Object.values(out).reduce((a, b) => a + b, 0), ...out, upcoming: up[0].n };
+  const adv = await advanceStats('r.partner_id = $2', [partnerId]);
+  return { total: Object.values(out).reduce((a, b) => a + b, 0), ...out, upcoming: up[0].n, ...adv };
+}
+
+/**
+ * Advance-reservation counts, for the partner dashboard (scoped to one partner) and the admin dashboard (all).
+ *   advance             every advance reservation ever made
+ *   advancePending      waiting for the partner / admin to answer
+ *   upcomingAdvance     pending or confirmed, pickup still ahead
+ *   advanceNext7Days    of those, pickup within the next 7 days
+ * `scope` is a trusted SQL fragment written in this file ($1 is the clock, $2.. its values), never request input.
+ */
+async function advanceStats(scope = 'TRUE', scopeParams = []) {
+  const now = nowWall();
+  const { rows } = await query(
+    `SELECT COUNT(*) FILTER (WHERE r.booking_type = 'advance') AS advance,
+            COUNT(*) FILTER (WHERE r.booking_type = 'advance' AND r.status = 'pending') AS advance_pending,
+            COUNT(*) FILTER (WHERE r.booking_type = 'advance' AND r.status IN ('pending', 'confirmed')
+                               AND (r.pickup_date + r.pickup_time) > $1::timestamp) AS upcoming_advance,
+            COUNT(*) FILTER (WHERE r.booking_type = 'advance' AND r.status IN ('pending', 'confirmed')
+                               AND (r.pickup_date + r.pickup_time) > $1::timestamp
+                               AND (r.pickup_date + r.pickup_time) <= $1::timestamp + interval '7 days') AS advance_next7_days
+     FROM reservations r WHERE ${scope}`,
+    [now, ...scopeParams]
+  );
+  const row = rows[0];
+  return { advance: row.advance, advancePending: row.advancePending, upcomingAdvance: row.upcomingAdvance, advanceNext7Days: row.advanceNext7Days };
+}
+
+// Admin: status counts plus the advance counts, over every booking.
+async function statsForAdmin() {
+  const { rows } = await query('SELECT status, COUNT(*) AS n FROM reservations GROUP BY status');
+  const out = Object.fromEntries(R.STATUSES.map((s) => [s, 0]));
+  for (const row of rows) out[row.status] = row.n;
+  return { total: Object.values(out).reduce((a, b) => a + b, 0), ...out, ...(await advanceStats()) };
 }
 
 // ---------------------------------------------------------------------------------------- validation
 
 // Business-rule validation of the requested window. Shape errors are already caught by the route validator,
 // but this runs again so the service is safe to call from anywhere.
-function checkWindow(input) {
+// `advance: true` is when the customer explicitly asked for an advance reservation: the pickup must then also be at
+// least rules.advanceMinHours away. Without it the window is checked exactly as before.
+function checkWindow(input, { advance = false } = {}) {
   const window = {
     pickupDate: input.pickupDate, pickupTime: input.pickupTime,
     returnDate: input.returnDate, returnTime: input.returnTime,
   };
-  const errors = R.validateWindow(window, nowWall(), rules);
+  const check = advance ? R.validateAdvanceWindow : R.validateWindow;
+  const errors = check(window, nowWall(), rules);
   if (errors.length) throw unprocessable(errors[0], errors);
   return { ...window, pickupAt: R.wall(window.pickupDate, window.pickupTime), returnAt: R.wall(window.returnDate, window.returnTime) };
 }
@@ -191,7 +242,7 @@ async function loadBookableCar(q, carId, { lock }) {
  * Price and availability come only from the database.
  */
 async function quote(user, input) {
-  const w = checkWindow(input);
+  const w = checkWindow(input, { advance: input.bookingType === 'advance' });
   const car = await loadBookableCar(query, input.carId, { lock: false });
   await availability.assertRangeFree(query, car.id, w.pickupDate, w.returnDate); // 409 when not free
   const pricing = R.computePrice(car.dailyPrice, w.pickupAt, w.returnAt, rules);
@@ -203,6 +254,10 @@ async function quote(user, input) {
     returnDate: w.returnDate, returnTime: w.returnTime,
     pricing,
     available: true,
+    // 'advance' when the pickup is far enough ahead; this is what create() will store for the same window.
+    bookingType: R.bookingTypeFor(w.pickupAt, nowWall(), rules),
+    leadHours: Math.floor(R.leadHours(w.pickupAt, nowWall())),
+    advanceMinHours: rules.advanceMinHours,
     eligibility: {
       canBook: verificationStatus === 'approved',
       verificationStatus,
@@ -228,7 +283,9 @@ const REFERENCE_ATTEMPTS = 5;
  * The reservations_no_overlap EXCLUDE constraint backs this up inside PostgreSQL itself.
  */
 async function create(user, input) {
-  const w = checkWindow(input);
+  const w = checkWindow(input, { advance: input.bookingType === 'advance' });
+  // Decided by the server from the pickup time; a client can only insist on 'advance' (checked above), never choose.
+  const bookingType = R.bookingTypeFor(w.pickupAt, nowWall(), rules);
 
   const id = await withTransaction(async (q) => {
     const car = await loadBookableCar(q, input.carId, { lock: true });
@@ -241,11 +298,11 @@ async function create(user, input) {
         const { rows } = await q(
           `INSERT INTO reservations
              (customer_id, partner_id, car_id, pickup_location, pickup_date, pickup_time, return_date, return_time,
-              status, daily_price, rental_days, subtotal_amount, service_fee_amount, tax_amount, total_price)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14)
+              status, daily_price, rental_days, subtotal_amount, service_fee_amount, tax_amount, total_price, booking_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12, $13, $14, $15)
            RETURNING id`,
           [user.id, car.partnerId, car.id, car.location, w.pickupDate, w.pickupTime, w.returnDate, w.returnTime,
-           p.dailyPrice, p.rentalDays, p.subtotal, p.serviceFee, p.tax, p.total]
+           p.dailyPrice, p.rentalDays, p.subtotal, p.serviceFee, p.tax, p.total, bookingType]
         );
         await q('RELEASE SAVEPOINT new_reservation');
         await q(
@@ -315,6 +372,6 @@ const cancelForCustomer = (customer, id, reason) => changeStatus({ id: customer.
 
 module.exports = {
   nowWall, listForCustomer, getForCustomer, detailForCustomer, quote, create,
-  listForPartner, getForPartner, statsForPartner, listForAdmin, getForAdmin,
+  listForPartner, getForPartner, statsForPartner, advanceStats, statsForAdmin, listForAdmin, getForAdmin,
   changeStatus, cancelForCustomer, historyOf,
 };

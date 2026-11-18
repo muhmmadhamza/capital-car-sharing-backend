@@ -13,7 +13,7 @@ exports.updateMe = asyncHandler(async (req, res) => {
 });
 
 exports.getReservations = asyncHandler(async (req, res) => {
-  success(res, { reservations: await reservationService.listForCustomer(req.user.id, { status: req.query.status }) });
+  success(res, { reservations: await reservationService.listForCustomer(req.user.id, { status: req.query.status, bookingType: req.query.bookingType, upcoming: req.query.upcoming }) });
 });
 
 exports.getReservation = asyncHandler(async (req, res) => {
@@ -26,7 +26,8 @@ exports.cancelReservation = asyncHandler(async (req, res) => {
 });
 
 // Only the car and the rental window are read from the body. The customer is always the signed-in user.
-const windowOf = (b) => ({ carId: b.carId, pickupDate: b.pickupDate, pickupTime: b.pickupTime, returnDate: b.returnDate, returnTime: b.returnTime });
+// bookingType is only read to let the customer INSIST on an advance reservation; the server decides the stored type.
+const windowOf = (b) => ({ carId: b.carId, pickupDate: b.pickupDate, pickupTime: b.pickupTime, returnDate: b.returnDate, returnTime: b.returnTime, bookingType: b.bookingType });
 
 exports.quoteReservation = asyncHandler(async (req, res) => {
   success(res, await reservationService.quote(req.user, windowOf(req.body)));

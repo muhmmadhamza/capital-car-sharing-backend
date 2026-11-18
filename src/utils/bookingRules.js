@@ -56,6 +56,55 @@ function validateWindow({ pickupDate, pickupTime, returnDate, returnTime }, now,
   return [];
 }
 
+// ------------------------------------------------------------------------------------------ advance reservations
+// An ADVANCE reservation is a normal reservation whose pickup is at least `rules.advanceMinHours` after it is made.
+// It is decided here (by the server) and stored in reservations.booking_type; the client never decides it.
+const BOOKING_TYPES = ['standard', 'advance'];
+
+const addHours = (wallValue, hours) => {
+  const d = parseWall(wallValue);
+  d.setUTCMinutes(d.getUTCMinutes() + Math.round(hours * 60));
+  return d.toISOString().slice(0, 16);
+};
+
+// Hours between `now` and the pickup (can be negative for a pickup in the past).
+const leadHours = (pickupAt, now) => (parseWall(pickupAt) - parseWall(now)) / HOUR_MS;
+
+const bookingTypeFor = (pickupAt, now, rules) => (leadHours(pickupAt, now) >= rules.advanceMinHours ? 'advance' : 'standard');
+
+/**
+ * A window that someone explicitly asks to book as an advance reservation: it must be a valid rental window AND
+ * start far enough ahead. Returns a list of messages (empty = acceptable).
+ */
+function validateAdvanceWindow(window, now, rules) {
+  const errors = validateWindow(window, now, rules);
+  if (errors.length) return errors;
+  const pickupAt = wall(window.pickupDate, window.pickupTime);
+  if (bookingTypeFor(pickupAt, now, rules) !== 'advance') {
+    return [`Advance reservations must start at least ${rules.advanceMinHours} hours from now`];
+  }
+  return [];
+}
+
+/**
+ * Date-only version for searching available cars for an advance reservation (the search has no pickup time yet).
+ * The earliest pickup DATE is the date of (now + advanceMinHours).
+ */
+function validateAdvanceSearch({ pickupDate, returnDate }, now, rules) {
+  if (!isDateString(pickupDate) || !isDateString(returnDate)) return ['pickupDate and returnDate must be YYYY-MM-DD'];
+  if (returnDate < pickupDate) return ['returnDate must be on or after pickupDate'];
+  const earliest = addHours(now, rules.advanceMinHours).slice(0, 10);
+  if (pickupDate < earliest) {
+    return [`Advance reservations start at least ${rules.advanceMinHours} hours from now (earliest pickup date: ${earliest})`];
+  }
+  if (pickupDate > addDays(now.slice(0, 10), rules.maxAdvanceDays)) {
+    return [`Pickup can be at most ${rules.maxAdvanceDays} days from today`];
+  }
+  const days = (new Date(`${returnDate}T00:00:00Z`) - new Date(`${pickupDate}T00:00:00Z`)) / DAY_MS;
+  if (days > rules.maxDays) return [`Rentals can be up to ${rules.maxDays} days`];
+  return [];
+}
+
 // Money is computed in integer cents so 0.1 + 0.2 style float errors can never reach the database.
 const toCents = (amount) => Math.round(Number(amount) * 100);
 const fromCents = (cents) => cents / 100;
@@ -140,4 +189,4 @@ const BLOCKED_MESSAGES = {
 const bookingBlockedMessage = (status) =>
   BLOCKED_MESSAGES[status] || 'Your identity must be verified and approved before you can book.';
 
-module.exports = { TRANSITIONS, STATUSES, HOLDING, REASON_MAX, checkTransition, customerCanCancel, bookingBlockedMessage, isDateString, isTimeString, wall, addDays, rentalDays, validateWindow, computePrice };
+module.exports = { BOOKING_TYPES, addHours, leadHours, bookingTypeFor, validateAdvanceWindow, validateAdvanceSearch, TRANSITIONS, STATUSES, HOLDING, REASON_MAX, checkTransition, customerCanCancel, bookingBlockedMessage, isDateString, isTimeString, wall, addDays, rentalDays, validateWindow, computePrice };

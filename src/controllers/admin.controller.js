@@ -26,6 +26,10 @@ exports.reservations = asyncHandler(async (req, res) => {
   success(res, { reservations }, 200, meta);
 });
 
+exports.reservationStats = asyncHandler(async (_req, res) => {
+  success(res, { stats: await reservationService.statsForAdmin() });
+});
+
 exports.reservation = asyncHandler(async (req, res) => {
   success(res, { reservation: await reservationService.getForAdmin(Number(req.params.id)) });
 });

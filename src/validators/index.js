@@ -1,5 +1,5 @@
 const v = require('../utils/validators');
-const { rangeProblem } = require('../services/availability.service');
+const { rangeProblem, today } = require('../services/availability.service');
 const bookingRules = require('../config/booking');
 const R = require('../utils/bookingRules');
 const { nowWall } = require('../utils/clock');
@@ -127,12 +127,31 @@ const availabilityQuery = (req) => {
   return e;
 };
 
+// Body of PUT /partners/me/cars/:id/availability: { status, dates | startDate+endDate, reason? }.
+// Backwards compatible: { dates, status } works exactly as before. Past dates are refused (today is fine).
 const availabilityUpdate = (req) => {
   const b = body(req);
   const e = [];
-  if (!Array.isArray(b.dates) || !b.dates.length || b.dates.length > 366 || !b.dates.every(v.isDate))
-    e.push('dates must be a non-empty array (max 366) of YYYY-MM-DD values');
   if (!['available', 'unavailable'].includes(b.status)) e.push('status must be available or unavailable');
+  const hasDates = b.dates !== undefined;
+  const hasRange = b.startDate !== undefined || b.endDate !== undefined;
+  if (hasDates && hasRange) e.push('Send either dates or startDate and endDate, not both');
+  else if (hasDates) {
+    if (!Array.isArray(b.dates) || !b.dates.length || b.dates.length > 366 || !b.dates.every(v.isDate))
+      e.push('dates must be a non-empty array (max 366) of YYYY-MM-DD values');
+    else if (b.dates.some((d) => d < today())) e.push('Dates in the past cannot be changed');
+  } else if (hasRange) {
+    if (!v.isDate(b.startDate) || !v.isDate(b.endDate)) e.push('startDate and endDate must be YYYY-MM-DD');
+    else {
+      const problem = rangeProblem(b.startDate, b.endDate);
+      if (problem) e.push(problem);
+      else if (b.startDate < today()) e.push('Dates in the past cannot be changed');
+    }
+  } else e.push('dates (or startDate and endDate) are required');
+  if (b.reason !== undefined && b.reason !== null) {
+    if (typeof b.reason !== 'string' || b.reason.trim().length > 200) e.push('reason must be text of at most 200 characters');
+    else if (b.reason.trim() && b.status !== 'unavailable') e.push('A reason can only be given when blocking dates');
+  }
   return e;
 };
 

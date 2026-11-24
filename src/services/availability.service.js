@@ -57,7 +57,8 @@ async function dayStatusRows(carIds, start, end) {
   return rows;
 }
 
-async function getCarAvailability(carId, { startDate, endDate } = {}) {
+// `includeBlockDetails` is for the OWNER's calendar only: the public endpoint never exposes why a day is blocked.
+async function getCarAvailability(carId, { startDate, endDate } = {}, { includeBlockDetails = false } = {}) {
   const start = startDate || today();
   const end = endDate || addDays(start, DEFAULT_RANGE_DAYS);
 
@@ -66,6 +67,17 @@ async function getCarAvailability(carId, { startDate, endDate } = {}) {
 
   const rows = await dayStatusRows([carId], start, end);
   const pick = (s) => rows.filter((r) => r.status === s).map((r) => r.date);
+  let blockedDetails;
+  if (includeBlockDetails) {
+    const details = await query(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date, reason, blocked_at
+       FROM availability
+       WHERE car_id = $1 AND status = 'unavailable' AND date BETWEEN $2::date AND $3::date
+       ORDER BY date`,
+      [carId, start, end]
+    );
+    blockedDetails = details.rows.map((r) => ({ date: r.date, reason: r.reason ?? null, blockedAt: r.blockedAt ?? null }));
+  }
   return {
     carId,
     startDate: start,
@@ -74,6 +86,7 @@ async function getCarAvailability(carId, { startDate, endDate } = {}) {
     availableDates: pick('available'),
     unavailableDates: pick('unavailable'),
     bookedDates: pick('booked'),
+    ...(blockedDetails ? { blockedDetails } : {}),
   };
 }
 
@@ -116,8 +129,14 @@ async function findBookedDates(q, carId, dates) {
  * Booked days can never be changed: if any requested day is booked the WHOLE request is
  * refused with 409 and nothing is written.
  * The car row is locked for the duration, so this cannot interleave with a booking made at the same time.
+ * `reason` (optional, only when blocking) and `userId` (who blocked) are stored on the blocked days.
+ * Dates in the past are refused here as well as in the request validator.
  */
-async function setCarDates(carId, dates, status) {
+async function setCarDates(carId, dates, status, { reason, userId } = {}) {
+  const past = dates.filter((d) => d < today());
+  if (past.length) throw badRequest(`Dates in the past cannot be changed: ${preview([...new Set(past)].sort())}`);
+  const cleanReason = typeof reason === 'string' && reason.trim() ? reason.trim() : null;
+  if (cleanReason && status !== 'unavailable') throw badRequest('A reason can only be given when blocking dates');
   await withTransaction(async (q) => {
     await q('SELECT id FROM cars WHERE id = $1 FOR UPDATE', [carId]);
     const booked = await findBookedDates(q, carId, dates);
@@ -127,10 +146,12 @@ async function setCarDates(carId, dates, status) {
       await q(`DELETE FROM availability WHERE car_id = $1 AND date = ANY($2::date[]) AND status = 'unavailable'`, [carId, dates]);
     } else {
       await q(
-        `INSERT INTO availability (car_id, date, status)
-         SELECT $1, d, 'unavailable' FROM unnest($2::date[]) AS d
-         ON CONFLICT (car_id, date) DO UPDATE SET status = 'unavailable' WHERE availability.status <> 'booked'`,
-        [carId, dates]
+        `INSERT INTO availability (car_id, date, status, reason, blocked_by, blocked_at)
+         SELECT $1, d, 'unavailable', $3, $4, NOW() FROM unnest($2::date[]) AS d
+         ON CONFLICT (car_id, date) DO UPDATE
+           SET status = 'unavailable', reason = EXCLUDED.reason, blocked_by = EXCLUDED.blocked_by, blocked_at = NOW()
+           WHERE availability.status <> 'booked'`,
+        [carId, dates, cleanReason, userId ?? null]
       );
     }
   });
@@ -156,4 +177,32 @@ async function assertRangeFree(q, carId, pickupDate, returnDate) {
   if (rows.length) throw conflict(`This car is not available on: ${preview(rows.map((r) => r.date))}`);
 }
 
-module.exports = { getCarAvailability, getTodayStatuses, today, setCarDates, assertRangeFree, findBookedDates, rangeProblem };
+/**
+ * Call inside the transaction that cancels or rejects a reservation. Reservations are read live, so their days free
+ * up by themselves; this additionally removes 'booked' rows in the availability table for those days (written by older
+ * data or seed scripts) unless another pending/confirmed reservation still covers them. Without it such a stale row
+ * would keep a released date booked forever.
+ */
+async function releaseBookedRows(q, reservationId) {
+  const { rowCount } = await q(
+    `DELETE FROM availability a
+     USING reservations r
+     WHERE r.id = $1 AND a.car_id = r.car_id AND a.status = 'booked'
+       AND a.date BETWEEN r.pickup_date AND r.return_date
+       AND NOT EXISTS (SELECT 1 FROM reservations o
+                       WHERE o.car_id = a.car_id AND o.id <> r.id AND o.status IN ('pending', 'confirmed')
+                         AND a.date BETWEEN o.pickup_date AND o.return_date)`,
+    [reservationId]
+  );
+  return rowCount;
+}
+
+// The days a block/unblock request covers: either an explicit `dates` list or an inclusive startDate..endDate range.
+function expandDates({ dates, startDate, endDate }) {
+  if (Array.isArray(dates)) return [...new Set(dates)].sort();
+  const out = [];
+  for (let d = startDate; d <= endDate; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+module.exports = { releaseBookedRows, expandDates, getCarAvailability, getTodayStatuses, today, setCarDates, assertRangeFree, findBookedDates, rangeProblem };

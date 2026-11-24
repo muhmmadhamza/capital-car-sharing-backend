@@ -358,6 +358,8 @@ async function changeStatus(actor, id, to, reason) {
     }
 
     await q('UPDATE reservations SET status = $2, updated_at = NOW() WHERE id = $1', [id, to]);
+    // Cancelled / rejected bookings stop holding the car: also clear any stale 'booked' availability rows for their days.
+    if (to === 'cancelled' || to === 'rejected') await availability.releaseBookedRows(q, id);
     await q(
       `INSERT INTO reservation_status_history (reservation_id, from_status, to_status, changed_by, changed_by_role, reason)
        VALUES ($1, $2, $3, $4, $5, $6)`,

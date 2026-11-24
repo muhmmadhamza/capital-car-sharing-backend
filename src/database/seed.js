@@ -131,7 +131,7 @@ async function seed() {
     const reservations = [
       [0, 0, -30, -27, 'completed'],
       [2, 0, -10, -8, 'completed'],
-      [5, 1, -2, 2, 'active'],
+      [5, 1, -2, 2, 'confirmed'], // out on rental now: a confirmed booking whose dates include today
       [1, 0, 4, 7, 'confirmed'],
       [8, 2, 10, 12, 'pending'],
       [6, 1, 3, 5, 'cancelled'],
@@ -145,16 +145,8 @@ async function seed() {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`,
         [customerIds[cu], partnerIds[car.p], carIds[ci], car.loc, fmt(offset(from)), fmt(offset(to)), status, car.price, days, car.price * days]
       );
-      // Mirror live reservations into availability as 'booked'
-      if (status === 'pending' || status === 'confirmed') {
-        for (const d of range(from, to)) {
-          await client.query(
-            `INSERT INTO availability (car_id, date, status) VALUES ($1,$2,'booked')
-             ON CONFLICT (car_id, date) DO UPDATE SET status = 'booked'`,
-            [carIds[ci], d]
-          );
-        }
-      }
+      // No 'booked' availability rows are written: pending/confirmed reservations are read live, so cancelling or
+      // rejecting one frees its days automatically (a stored copy would go stale).
     }
 
     await client.query('COMMIT');

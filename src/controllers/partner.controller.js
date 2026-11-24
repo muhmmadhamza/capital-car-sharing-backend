@@ -41,14 +41,18 @@ exports.getCarAvailability = asyncHandler(async (req, res) => {
   const carId = Number(req.params.id);
   await carService.getPartnerCar(req.partner.id, carId); // ownership check
   const { startDate, endDate } = req.query;
-  success(res, await availabilityService.getCarAvailability(carId, { startDate, endDate }));
+  success(res, await availabilityService.getCarAvailability(carId, { startDate, endDate }, { includeBlockDetails: true }));
 });
 
 exports.setCarAvailability = asyncHandler(async (req, res) => {
   const carId = Number(req.params.id);
   await carService.getPartnerCar(req.partner.id, carId); // ownership check
-  await availabilityService.setCarDates(carId, req.body.dates, req.body.status);
-  success(res, await availabilityService.getCarAvailability(carId));
+  // Block or re-open days. `dates` or startDate..endDate; the reason is stored on blocked days; the user comes from the session.
+  await availabilityService.setCarDates(carId, availabilityService.expandDates(req.body), req.body.status, {
+    reason: req.body.reason,
+    userId: req.user.id,
+  });
+  success(res, await availabilityService.getCarAvailability(carId, {}, { includeBlockDetails: true }));
 });
 
 // POST /partners/me/cars/:id/images  (multipart, field "image")
